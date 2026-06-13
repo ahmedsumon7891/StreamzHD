@@ -81,7 +81,7 @@ export default async function WatchPage({ params }: { params: Promise<{ slug: st
       <Header />
       <ViewIncrement slug={channel.slug} />
       <main className="max-w-[1600px] mx-auto px-4 sm:px-6 py-6 space-y-8">
-        <div className="sticky top-[64px] sm:top-[80px] z-30 bg-bg pb-2 shadow-md shadow-bg/50 -mx-4 sm:mx-0">
+        <div className="sticky md:relative top-[64px] md:top-auto z-30 md:z-0 bg-bg pb-2 md:pb-0 shadow-md md:shadow-none shadow-bg/50 -mx-4 sm:mx-0">
           <ClientVideoPlayer channelSlug={channel.slug} channelName={channel.name} logoUrl={channel.logo_url} />
         </div>
 

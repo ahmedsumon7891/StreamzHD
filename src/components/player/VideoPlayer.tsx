@@ -4,7 +4,7 @@ import videojs from "video.js";
 import "video.js/dist/video-js.css";
 import "@videojs/http-streaming";
 import type Player from "video.js/dist/types/player";
-import { Play, Pause, Volume2, VolumeX, Maximize, RotateCcw, MonitorPlay, Settings, Activity } from "lucide-react";
+import { Play, Pause, Volume2, VolumeX, Maximize, RotateCcw, MonitorPlay, Settings, Activity, Tv } from "lucide-react";
 
 interface Props {
   channelSlug: string;
@@ -130,7 +130,12 @@ export default function VideoPlayer({ channelSlug, channelName, logoUrl }: Props
       setIsMuted(player.muted() || false);
       setVolume(player.volume() || 0);
       setIsLive(player.duration() === Infinity || player.duration() === 0);
-      player.play()?.catch(() => undefined);
+      player.play()?.catch(() => {
+        // Autoplay fallback: if sound autoplay is blocked, play muted
+        player.muted(true);
+        setIsMuted(true);
+        player.play()?.catch(() => undefined);
+      });
     });
 
     const onKey = (e: KeyboardEvent) => {
@@ -236,6 +241,23 @@ export default function VideoPlayer({ channelSlug, channelName, logoUrl }: Props
       }
     } catch (e) {
       console.error(e);
+    }
+    triggerShowControls();
+  };
+
+  const toggleCast = async () => {
+    const video = videoRef.current;
+    if (!video) return;
+    try {
+      if ((video as any).webkitShowPlaybackTargetPicker) {
+        (video as any).webkitShowPlaybackTargetPicker();
+      } else if ((video as any).remote && typeof (video as any).remote.prompt === "function") {
+        await (video as any).remote.prompt();
+      } else {
+        alert("Casting is not supported by your browser in this mode.");
+      }
+    } catch (err) {
+      console.error("Cast error:", err);
     }
     triggerShowControls();
   };
@@ -439,6 +461,18 @@ export default function VideoPlayer({ channelSlug, channelName, logoUrl }: Props
                   </div>
                 )}
               </div>
+
+              {/* Cast to TV */}
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  toggleCast();
+                }}
+                title="Cast to TV"
+                className="p-1.5 hover:bg-white/10 rounded-full text-white transition-colors duration-150"
+              >
+                <Tv className="h-5 w-5" />
+              </button>
 
               {/* Picture-in-Picture */}
               <button
