@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { Sidebar } from "@/components/admin/Sidebar";
+import { ClientAdminLayout } from "./ClientAdminLayout";
 import { ToastHost } from "@/components/ui/Toast";
 import { getAdminUser } from "@/lib/auth";
 
@@ -11,10 +11,9 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   if (!admin) redirect("/admin/login");
 
   return (
-    <div className="flex min-h-screen">
-      <Sidebar />
-      <main className="flex-1 bg-bg">{children}</main>
+    <ClientAdminLayout>
+      {children}
       <ToastHost />
-    </div>
+    </ClientAdminLayout>
   );
 }
