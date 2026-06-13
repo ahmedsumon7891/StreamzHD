@@ -33,15 +33,28 @@ export async function GET(req: NextRequest) {
     }
 
     // If it's an M3U8 playlist, we need to rewrite relative segment chunk URLs
-    // (e.g. "segment1.ts" -> "/api/channels/proxy?url=https://domain.com/path/segment1.ts")
-    if (contentType.includes("mpegurl") || contentType.includes("application/x-mpegURL") || url.endsWith(".m3u8")) {
+    if (contentType.includes("mpegurl") || contentType.includes("application/x-mpegURL") || url.endsWith(".m3u8") || url.includes(".m3u8")) {
       const playlistText = await response.text();
-      const baseUrl = targetUrl.href.substring(0, targetUrl.href.lastIndexOf("/") + 1);
+      const baseUrl = targetUrl.origin + targetUrl.pathname.substring(0, targetUrl.pathname.lastIndexOf("/") + 1);
 
       const lines = playlistText.split(/\r?\n/);
       const rewrittenLines = lines.map((line) => {
         const trimmed = line.trim();
         if (!trimmed || trimmed.startsWith("#")) {
+          // Check for sub-playlists or keys inside tags that might contain URLs (e.g. URI="...")
+          if (trimmed.includes("URI=")) {
+            return line.replace(/URI="([^"]+)"/g, (match, subUrl) => {
+              let absoluteSubUrl = subUrl;
+              if (!subUrl.startsWith("http://") && !subUrl.startsWith("https://")) {
+                if (subUrl.startsWith("/")) {
+                  absoluteSubUrl = `${targetUrl.origin}${subUrl}`;
+                } else {
+                  absoluteSubUrl = `${baseUrl}${subUrl}`;
+                }
+              }
+              return `URI="/api/channels/proxy?url=${encodeURIComponent(absoluteSubUrl)}"`;
+            });
+          }
           return line;
         }
 
@@ -53,7 +66,7 @@ export async function GET(req: NextRequest) {
         // Relative URL
         let absoluteSegmentUrl = "";
         if (trimmed.startsWith("/")) {
-          absoluteSegmentUrl = `${targetUrl.protocol}//${targetUrl.host}${trimmed}`;
+          absoluteSegmentUrl = `${targetUrl.origin}${trimmed}`;
         } else {
           absoluteSegmentUrl = `${baseUrl}${trimmed}`;
         }
