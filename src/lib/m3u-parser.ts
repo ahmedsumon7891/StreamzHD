@@ -16,7 +16,7 @@ function parseAttrs(raw: string): Record<string, string> {
 export function parseM3U(text: string): ParsedM3UChannel[] {
   const lines = text.split(/\r?\n/);
   const channels: ParsedM3UChannel[] = [];
-  let pending: { name: string; logo: string; group: string; epgId: string; lang: string } | null =
+  let pending: { name: string; logo: string; group: string; epgId: string; lang: string; country: string } | null =
     null;
 
   for (const rawLine of lines) {
@@ -37,6 +37,7 @@ export function parseM3U(text: string): ParsedM3UChannel[] {
         group: attrs["group-title"] || "",
         epgId: attrs["tvg-id"] || "",
         lang: attrs["tvg-language"] || "",
+        country: attrs["tvg-country"] || attrs["country"] || "",
       };
       continue;
     }
@@ -52,6 +53,7 @@ export function parseM3U(text: string): ParsedM3UChannel[] {
         streamUrl: line,
         slug: generateSlug(pending.name),
         tvgLanguage: pending.lang || undefined,
+        country: pending.country || undefined,
       });
       pending = null;
     }

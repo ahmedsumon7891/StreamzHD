@@ -38,12 +38,15 @@ export async function POST(req: NextRequest) {
   const errors: string[] = [];
   const seen = new Set<string>();
 
-  // Resolve categories dynamically if no default category is chosen
+  // Resolve categories & countries dynamically if no defaults are chosen
   const defaultCategoryId: string | null = body?.category_id || null;
   const defaultCountryId: string | null = body?.country_id || null;
   const catMap = new Map<string, string>();
+  const countryMap = new Map<string, string>();
+  const takenCountryCodes = new Set<string>();
 
   try {
+    // Categories
     const { data: existingCats } = await supabaseAdmin.from("categories").select("id, name, slug");
     if (existingCats) {
       for (const c of existingCats) {
@@ -84,8 +87,73 @@ export async function POST(req: NextRequest) {
         }
       }
     }
+
+    // Countries
+    const { data: existingCountries } = await supabaseAdmin.from("countries").select("id, name, code");
+    if (existingCountries) {
+      for (const c of existingCountries) {
+        const uppercaseCode = c.code.toUpperCase();
+        countryMap.set(uppercaseCode, c.id);
+        countryMap.set(c.name.toLowerCase(), c.id);
+        takenCountryCodes.add(uppercaseCode);
+      }
+    }
+
+    if (!defaultCountryId) {
+      const missingCountryNames = new Set<string>();
+      for (const c of parsed) {
+        if (!c.name || !c.streamUrl || !c.country) continue;
+        const countryVal = c.country.trim();
+        if (!countryVal) continue;
+        const uppercaseVal = countryVal.toUpperCase();
+        if (!countryMap.has(uppercaseVal) && !countryMap.has(countryVal.toLowerCase())) {
+          missingCountryNames.add(countryVal);
+        }
+      }
+
+      if (missingCountryNames.size > 0) {
+        const getUniqueCode = (name: string, takenCodes: Set<string>): string => {
+          if (name.length === 2) {
+            const code = name.toUpperCase();
+            if (!takenCodes.has(code)) return code;
+          }
+          const base = (name.replace(/[^a-zA-Z]/g, "").slice(0, 2) || "XX").toUpperCase();
+          if (!takenCodes.has(base)) return base;
+          for (let i = 1; i < 10; i++) {
+            const alt = `${base[0]}${i}`;
+            if (!takenCodes.has(alt)) return alt;
+          }
+          for (let charCode = 65; charCode <= 90; charCode++) {
+            const alt = `${base[0]}${String.fromCharCode(charCode)}`;
+            if (!takenCodes.has(alt)) return alt;
+          }
+          return Math.random().toString(36).slice(2, 4).toUpperCase();
+        };
+
+        const newCountriesPayload = Array.from(missingCountryNames).map((name) => {
+          const code = getUniqueCode(name, takenCountryCodes);
+          takenCountryCodes.add(code);
+          return { name, code, sort_order: 0 };
+        });
+
+        const { data: createdCountries, error: createCountryError } = await supabaseAdmin
+          .from("countries")
+          .insert(newCountriesPayload)
+          .select("id, name, code");
+        if (createCountryError) {
+          errors.push(`Country creation warning: ${createCountryError.message}`);
+        } else if (createdCountries) {
+          for (const c of createdCountries) {
+            const uppercaseCode = c.code.toUpperCase();
+            countryMap.set(uppercaseCode, c.id);
+            countryMap.set(c.name.toLowerCase(), c.id);
+            takenCountryCodes.add(uppercaseCode);
+          }
+        }
+      }
+    }
   } catch (err) {
-    errors.push(`Category matching error: ${err instanceof Error ? err.message : String(err)}`);
+    errors.push(`Metadata matching error: ${err instanceof Error ? err.message : String(err)}`);
   }
 
   const rows = parsed
@@ -106,6 +174,14 @@ export async function POST(req: NextRequest) {
         const slug = generateSlug(groupName);
         categoryId = catMap.get(slug) || catMap.get(groupName.toLowerCase()) || null;
       }
+
+      let countryId = defaultCountryId;
+      if (!countryId && c.country) {
+        const countryVal = c.country.trim();
+        const uppercaseVal = countryVal.toUpperCase();
+        countryId = countryMap.get(uppercaseVal) || countryMap.get(countryVal.toLowerCase()) || null;
+      }
+
       return {
         name: sanitizeText(c.name, 200),
         slug: c.slug,
@@ -114,7 +190,7 @@ export async function POST(req: NextRequest) {
         epg_id: c.epgId || null,
         language: c.tvgLanguage || null,
         category_id: categoryId,
-        country_id: defaultCountryId,
+        country_id: countryId,
         is_active: true,
       };
     });

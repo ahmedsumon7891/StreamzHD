@@ -104,6 +104,7 @@ export interface ParsedM3UChannel {
   streamUrl: string;
   slug: string;
   tvgLanguage?: string;
+  country?: string;
 }
 
 export interface AdminTokenPayload {
