@@ -263,7 +263,7 @@ export default function VideoPlayer({ channelSlug, channelName, logoUrl }: Props
       onMouseMove={handleMouseMove}
       onMouseLeave={handleMouseLeave}
       onClick={triggerShowControls}
-      className="group relative w-full aspect-video bg-black rounded-xl overflow-hidden border border-border/80 select-none shadow-2xl shadow-primary/5"
+      className="group relative w-full aspect-video bg-black md:rounded-xl rounded-none overflow-hidden border-y md:border border-border/80 select-none shadow-2xl shadow-primary/5"
     >
       {/* Video element */}
       <div className="w-full h-full pointer-events-none" data-vjs-player>
@@ -347,7 +347,13 @@ export default function VideoPlayer({ channelSlug, channelName, logoUrl }: Props
         </div>
 
         {/* Bottom controls panel */}
-        <div className="w-full flex flex-col gap-3 bg-gradient-to-t from-black/90 via-black/40 to-transparent p-3 rounded-2xl pointer-events-auto">
+        <div className="w-full bg-gradient-to-t from-black/90 via-black/40 to-transparent px-3 pb-2 pt-6 pointer-events-auto flex flex-col gap-1.5">
+          {/* YouTube-style Progress/Live seekbar representation */}
+          <div className="w-full h-1 bg-white/20 relative group/progress mb-1 cursor-pointer">
+            <div className="absolute top-0 left-0 h-full w-full bg-primary" />
+            <div className="absolute right-0 top-1/2 -translate-y-1/2 w-3 h-3 rounded-full bg-primary opacity-0 group-hover/progress:opacity-100 transition-opacity" />
+          </div>
+
           <div className="flex items-center justify-between gap-4">
             <div className="flex items-center gap-3">
               {/* Play / Pause */}
@@ -356,9 +362,9 @@ export default function VideoPlayer({ channelSlug, channelName, logoUrl }: Props
                   e.stopPropagation();
                   togglePlay();
                 }}
-                className="p-2.5 bg-primary hover:bg-primary/90 rounded-full text-white transition-all transform hover:scale-105"
+                className="text-white hover:text-primary transition-colors duration-150 p-1.5"
               >
-                {isPlaying ? <Pause className="h-4 w-4 fill-white" /> : <Play className="h-4 w-4 fill-white ml-0.5" />}
+                {isPlaying ? <Pause className="h-5 w-5 fill-white" /> : <Play className="h-5 w-5 fill-white ml-0.5" />}
               </button>
 
               {/* Volume Controls */}
@@ -368,9 +374,9 @@ export default function VideoPlayer({ channelSlug, channelName, logoUrl }: Props
                     e.stopPropagation();
                     toggleMute();
                   }}
-                  className="p-2 hover:bg-white/10 rounded-full text-white transition-colors duration-150"
+                  className="p-1.5 hover:bg-white/10 rounded-full text-white transition-colors duration-150"
                 >
-                  {isMuted || volume === 0 ? <VolumeX className="h-4.5 w-4.5" /> : <Volume2 className="h-4.5 w-4.5" />}
+                  {isMuted || volume === 0 ? <VolumeX className="h-5 w-5" /> : <Volume2 className="h-5 w-5" />}
                 </button>
                 <div className="w-0 overflow-hidden group-hover/volume:w-20 transition-all duration-300 ease-out flex items-center">
                   <input
@@ -387,10 +393,18 @@ export default function VideoPlayer({ channelSlug, channelName, logoUrl }: Props
                   />
                 </div>
               </div>
+
+              {/* Live Badge */}
+              {isLive && (
+                <div className="flex items-center gap-1.5 ml-2">
+                  <span className="h-2 w-2 rounded-full bg-red-600 animate-pulse" />
+                  <span className="text-xs font-semibold tracking-wider text-red-500 uppercase">LIVE</span>
+                </div>
+              )}
             </div>
 
             {/* Right-aligned actions */}
-            <div className="flex items-center gap-1.5">
+            <div className="flex items-center gap-2">
               {/* Settings Trigger */}
               <div className="relative">
                 <button
@@ -398,11 +412,11 @@ export default function VideoPlayer({ channelSlug, channelName, logoUrl }: Props
                     e.stopPropagation();
                     setShowSettings(!showSettings);
                   }}
-                  className={`p-2 hover:bg-white/10 rounded-full text-white transition-colors duration-150 ${
+                  className={`p-1.5 hover:bg-white/10 rounded-full text-white transition-colors duration-150 ${
                     showSettings ? "text-primary bg-white/5" : ""
                   }`}
                 >
-                  <Settings className="h-4.5 w-4.5" />
+                  <Settings className="h-5 w-5" />
                 </button>
 
                 {showSettings && (
@@ -433,9 +447,9 @@ export default function VideoPlayer({ channelSlug, channelName, logoUrl }: Props
                   togglePip();
                 }}
                 title="Picture in Picture"
-                className={`p-2 hover:bg-white/10 rounded-full text-white transition-colors duration-150 ${isPip ? "text-primary" : ""}`}
+                className={`p-1.5 hover:bg-white/10 rounded-full text-white transition-colors duration-150 ${isPip ? "text-primary" : ""}`}
               >
-                <MonitorPlay className="h-4.5 w-4.5" />
+                <MonitorPlay className="h-5 w-5" />
               </button>
 
               {/* Fullscreen */}
@@ -444,9 +458,9 @@ export default function VideoPlayer({ channelSlug, channelName, logoUrl }: Props
                   e.stopPropagation();
                   toggleFullscreen();
                 }}
-                className="p-2 hover:bg-white/10 rounded-full text-white transition-colors duration-150"
+                className="p-1.5 hover:bg-white/10 rounded-full text-white transition-colors duration-150"
               >
-                <Maximize className="h-4.5 w-4.5" />
+                <Maximize className="h-5 w-5" />
               </button>
             </div>
           </div>
