@@ -43,13 +43,36 @@ export default async function WatchPage({ params }: { params: Promise<{ slug: st
   const channel = await fetchChannel(slug);
   if (!channel) notFound();
 
-  const { data: related } = await supabasePublic
-    .from("channels")
-    .select("*, category:categories(name,slug), country:countries(name,code)")
-    .eq("is_active", true)
-    .eq("category_id", channel.category_id)
-    .neq("id", channel.id)
-    .limit(12);
+  // Fetch related channels securely without exposing stream_url
+  let relatedChannels: Channel[] = [];
+  if (channel.category_id) {
+    const { data } = await supabasePublic
+      .from("channels")
+      .select("id, name, slug, logo_url, category_id, country_id, language, is_featured, is_active, view_count, category:categories(name,slug), country:countries(name,code)")
+      .eq("is_active", true)
+      .eq("category_id", channel.category_id)
+      .neq("id", channel.id)
+      .limit(12);
+    relatedChannels = (data as unknown as Channel[]) || [];
+  }
+
+  if (relatedChannels.length < 6) {
+    const { data: fallback } = await supabasePublic
+      .from("channels")
+      .select("id, name, slug, logo_url, category_id, country_id, language, is_featured, is_active, view_count, category:categories(name,slug), country:countries(name,code)")
+      .eq("is_active", true)
+      .neq("id", channel.id)
+      .order("view_count", { ascending: false })
+      .limit(12 - relatedChannels.length);
+    if (fallback) {
+      const existingIds = new Set(relatedChannels.map(c => c.id));
+      for (const item of fallback) {
+        if (!existingIds.has(item.id)) {
+          relatedChannels.push(item as unknown as Channel);
+        }
+      }
+    }
+  }
 
   const url = `${process.env.NEXT_PUBLIC_APP_URL || ""}/watch/${channel.slug}`;
 
@@ -97,7 +120,7 @@ export default async function WatchPage({ params }: { params: Promise<{ slug: st
         </div>
 
         <AdSlot position="below_player" />
-        <ChannelGrid title="Related channels" channels={(related as Channel[]) || []} />
+        <ChannelGrid title="Related channels" channels={relatedChannels} />
       </main>
       <Footer />
     </>
