@@ -1,5 +1,4 @@
 import { notFound } from "next/navigation";
-import dynamic from "next/dynamic";
 import Image from "next/image";
 import Link from "next/link";
 import type { Metadata } from "next";
@@ -10,9 +9,8 @@ import { ChannelGrid } from "@/components/home/ChannelGrid";
 import { AdSlot } from "@/components/ui/AdSlot";
 import { QRShare } from "@/components/ui/QRShare";
 import { ViewIncrement } from "./view-increment";
+import { ClientVideoPlayer } from "@/components/player/ClientVideoPlayer";
 import type { Channel } from "@/types";
-
-const VideoPlayer = dynamic(() => import("@/components/player/VideoPlayer"), { ssr: false });
 
 export const revalidate = 30;
 
@@ -60,7 +58,7 @@ export default async function WatchPage({ params }: { params: Promise<{ slug: st
       <Header />
       <ViewIncrement slug={channel.slug} />
       <main className="max-w-[1600px] mx-auto px-4 sm:px-6 py-6 space-y-8">
-        <VideoPlayer streamUrl={channel.stream_url} channelName={channel.name} logoUrl={channel.logo_url} />
+        <ClientVideoPlayer streamUrl={channel.stream_url} channelName={channel.name} logoUrl={channel.logo_url} />
 
         <div className="grid md:grid-cols-[1fr,300px] gap-8">
           <div>
