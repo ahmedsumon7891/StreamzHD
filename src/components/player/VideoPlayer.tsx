@@ -4,6 +4,7 @@ import videojs from "video.js";
 import "video.js/dist/video-js.css";
 import "@videojs/http-streaming";
 import type Player from "video.js/dist/types/player";
+import { Play, Pause, Volume2, VolumeX, Maximize, RotateCcw, MonitorPlay, Settings, Activity } from "lucide-react";
 
 interface Props {
   streamUrl: string;
@@ -14,23 +15,54 @@ interface Props {
 export default function VideoPlayer({ streamUrl, channelName, logoUrl }: Props) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const playerRef = useRef<Player | null>(null);
+  const containerRef = useRef<HTMLDivElement | null>(null);
+
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [isMuted, setIsMuted] = useState(false);
+  const [volume, setVolume] = useState(1);
+  const [showControls, setShowControls] = useState(true);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [isPip, setIsPip] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
+  const [playbackRate, setPlaybackRate] = useState(1);
   const [retries, setRetries] = useState(0);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isLive, setIsLive] = useState(true);
+  const controlsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     if (!videoRef.current) return;
     const isHls = /\.m3u8(\?|$)/i.test(streamUrl);
+
+    // Initial setup with videojs
     const player = videojs(videoRef.current, {
-      controls: true,
+      controls: false, // Turn off default controls to use our own
       autoplay: true,
       preload: "auto",
       fluid: true,
       responsive: true,
-      playbackRates: [0.5, 1, 1.25, 1.5, 2],
       html5: { vhs: { overrideNative: true } },
       sources: [{ src: streamUrl, type: isHls ? "application/x-mpegURL" : "video/mp4" }],
       poster: logoUrl || undefined,
     });
+
     playerRef.current = player;
+
+    player.on("play", () => {
+      setIsPlaying(true);
+      setIsLoading(false);
+    });
+    player.on("pause", () => setIsPlaying(false));
+    player.on("volumechange", () => {
+      setIsMuted(player.muted() || false);
+      setVolume(player.volume() || 0);
+    });
+    player.on("waiting", () => setIsLoading(true));
+    player.on("playing", () => setIsLoading(false));
+    player.on("ratechange", () => setPlaybackRate(player.playbackRate() || 1));
+    player.on("fullscreenchange", () => setIsFullscreen(player.isFullscreen() || false));
+    player.on("enterpictureinpicture", () => setIsPip(true));
+    player.on("leavepictureinpicture", () => setIsPip(false));
 
     player.on("error", () => {
       if (retries < 3) {
@@ -42,35 +74,312 @@ export default function VideoPlayer({ streamUrl, channelName, logoUrl }: Props) 
       }
     });
 
+    // Handle initial state
+    player.ready(() => {
+      setIsMuted(player.muted() || false);
+      setVolume(player.volume() || 0);
+      setIsLive(player.duration() === Infinity || player.duration() === 0);
+      player.play()?.catch(() => undefined);
+    });
+
     const onKey = (e: KeyboardEvent) => {
       const tag = (e.target as HTMLElement)?.tagName;
       if (tag === "INPUT" || tag === "TEXTAREA") return;
-      if (e.code === "Space") { e.preventDefault(); player.paused() ? player.play() : player.pause(); }
-      else if (e.key.toLowerCase() === "f") player.isFullscreen() ? player.exitFullscreen() : player.requestFullscreen();
-      else if (e.key.toLowerCase() === "m") player.muted(!player.muted());
-      else if (e.key === "ArrowUp") player.volume(Math.min(1, (player.volume() || 0) + 0.1));
-      else if (e.key === "ArrowDown") player.volume(Math.max(0, (player.volume() || 0) - 0.1));
+      if (e.code === "Space") {
+        e.preventDefault();
+        togglePlay();
+      } else if (e.key.toLowerCase() === "f") {
+        toggleFullscreen();
+      } else if (e.key.toLowerCase() === "m") {
+        toggleMute();
+      } else if (e.key === "ArrowUp") {
+        e.preventDefault();
+        changeVolume(Math.min(1, volume + 0.1));
+      } else if (e.key === "ArrowDown") {
+        e.preventDefault();
+        changeVolume(Math.max(0, volume - 0.1));
+      }
     };
     window.addEventListener("keydown", onKey);
 
     return () => {
       window.removeEventListener("keydown", onKey);
-      if (playerRef.current) { playerRef.current.dispose(); playerRef.current = null; }
+      if (playerRef.current) {
+        playerRef.current.dispose();
+        playerRef.current = null;
+      }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [streamUrl]);
 
+  // Autohide controls logic
+  const triggerShowControls = () => {
+    setShowControls(true);
+    if (controlsTimeoutRef.current) clearTimeout(controlsTimeoutRef.current);
+    controlsTimeoutRef.current = setTimeout(() => {
+      if (isPlaying) {
+        setShowControls(false);
+        setShowSettings(false);
+      }
+    }, 3500);
+  };
+
+  const handleMouseMove = () => triggerShowControls();
+  const handleMouseLeave = () => {
+    if (isPlaying) {
+      setShowControls(false);
+      setShowSettings(false);
+    }
+  };
+
+  const togglePlay = () => {
+    if (!playerRef.current) return;
+    if (playerRef.current.paused()) {
+      playerRef.current.play()?.catch(() => undefined);
+    } else {
+      playerRef.current.pause();
+    }
+    triggerShowControls();
+  };
+
+  const toggleMute = () => {
+    if (!playerRef.current) return;
+    const currentMute = playerRef.current.muted();
+    playerRef.current.muted(!currentMute);
+    setIsMuted(!currentMute);
+    triggerShowControls();
+  };
+
+  const changeVolume = (val: number) => {
+    if (!playerRef.current) return;
+    playerRef.current.volume(val);
+    setVolume(val);
+    if (val > 0) {
+      playerRef.current.muted(false);
+      setIsMuted(false);
+    }
+    triggerShowControls();
+  };
+
+  const toggleFullscreen = () => {
+    if (!playerRef.current) return;
+    if (playerRef.current.isFullscreen()) {
+      playerRef.current.exitFullscreen();
+      setIsFullscreen(false);
+    } else {
+      playerRef.current.requestFullscreen();
+      setIsFullscreen(true);
+    }
+    triggerShowControls();
+  };
+
+  const togglePip = async () => {
+    if (!videoRef.current) return;
+    try {
+      if (document.pictureInPictureElement) {
+        await document.exitPictureInPicture();
+        setIsPip(false);
+      } else {
+        await videoRef.current.requestPictureInPicture();
+        setIsPip(true);
+      }
+    } catch (e) {
+      console.error(e);
+    }
+    triggerShowControls();
+  };
+
+  const handleReload = () => {
+    if (!playerRef.current) return;
+    setIsLoading(true);
+    const isHls = /\.m3u8(\?|$)/i.test(streamUrl);
+    playerRef.current.src({ src: streamUrl, type: isHls ? "application/x-mpegURL" : "video/mp4" });
+    playerRef.current.play()?.catch(() => undefined);
+    triggerShowControls();
+  };
+
+  const handleRateChange = (rate: number) => {
+    if (!playerRef.current) return;
+    playerRef.current.playbackRate(rate);
+    setPlaybackRate(rate);
+    setShowSettings(false);
+    triggerShowControls();
+  };
+
   return (
-    <div className="w-full bg-black rounded-xl overflow-hidden border border-border" data-vjs-player>
-      <video
-        ref={videoRef}
-        className="video-js vjs-big-play-centered"
-        playsInline
-        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-        // @ts-ignore — non-standard AirPlay attribute
-        x-webkit-airplay="allow"
-        aria-label={channelName}
-      />
+    <div
+      ref={containerRef}
+      onMouseMove={handleMouseMove}
+      onMouseLeave={handleMouseLeave}
+      onClick={triggerShowControls}
+      className="group relative w-full aspect-video bg-black rounded-xl overflow-hidden border border-border/80 select-none shadow-2xl shadow-primary/5"
+    >
+      {/* Video element */}
+      <div className="w-full h-full pointer-events-none" data-vjs-player>
+        <video
+          ref={videoRef}
+          className="video-js w-full h-full object-contain"
+          playsInline
+          // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+          // @ts-ignore
+          x-webkit-airplay="allow"
+          aria-label={channelName}
+        />
+      </div>
+
+      {/* Tap / Click Area to Play/Pause */}
+      <div 
+        onClick={(e) => {
+          e.stopPropagation();
+          togglePlay();
+        }}
+        className="absolute inset-0 z-10 flex items-center justify-center cursor-pointer bg-gradient-to-t from-black/40 via-transparent to-black/25"
+      >
+        {isLoading && (
+          <div className="flex flex-col items-center gap-3 bg-black/60 backdrop-blur-md px-6 py-4 rounded-2xl border border-white/10 animate-fade-in">
+            <Activity className="h-8 w-8 text-primary animate-pulse" />
+            <span className="text-xs font-semibold tracking-wider text-text-muted">CONNECTING STREAM</span>
+          </div>
+        )}
+      </div>
+
+      {/* Control Overlay */}
+      <div
+        className={`absolute inset-0 z-20 flex flex-col justify-between p-4 transition-opacity duration-300 pointer-events-none ${
+          showControls ? "opacity-100" : "opacity-0"
+        }`}
+      >
+        {/* Top bar info */}
+        <div className="flex items-center justify-between w-full pointer-events-auto">
+          <div className="flex items-center gap-3 bg-black/65 backdrop-blur-md px-4 py-1.5 rounded-full border border-white/5">
+            {isLive && (
+              <span className="flex items-center gap-1.5">
+                <span className="h-2 w-2 rounded-full bg-red-600 animate-ping" />
+                <span className="h-2 w-2 rounded-full bg-red-500 absolute" />
+                <span className="text-[10px] font-bold tracking-wider text-white ml-1.5 uppercase">LIVE</span>
+              </span>
+            )}
+            <span className="text-xs font-semibold text-white/95 max-w-[200px] truncate">{channelName}</span>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                handleReload();
+              }}
+              title="Refresh Stream"
+              className="p-2 bg-black/65 hover:bg-black/80 backdrop-blur-md rounded-full text-white/90 hover:text-primary transition border border-white/5 pointer-events-auto"
+            >
+              <RotateCcw className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
+
+        {/* Bottom controls panel */}
+        <div className="w-full flex flex-col gap-3 bg-gradient-to-t from-black/90 via-black/40 to-transparent p-3 rounded-2xl pointer-events-auto">
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              {/* Play / Pause */}
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  togglePlay();
+                }}
+                className="p-2.5 bg-primary hover:bg-primary/90 rounded-full text-white transition-all transform hover:scale-105"
+              >
+                {isPlaying ? <Pause className="h-4 w-4 fill-white" /> : <Play className="h-4 w-4 fill-white ml-0.5" />}
+              </button>
+
+              {/* Volume Controls */}
+              <div className="flex items-center gap-1.5 group/volume">
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    toggleMute();
+                  }}
+                  className="p-2 hover:bg-white/10 rounded-full text-white transition"
+                >
+                  {isMuted || volume === 0 ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
+                </button>
+                <input
+                  type="range"
+                  min="0"
+                  max="1"
+                  step="0.05"
+                  value={isMuted ? 0 : volume}
+                  onChange={(e) => {
+                    e.stopPropagation();
+                    changeVolume(parseFloat(e.target.value));
+                  }}
+                  className="w-0 group-hover/volume:w-16 h-1 bg-white/20 rounded-full appearance-none cursor-pointer accent-primary transition-all duration-300 outline-none"
+                />
+              </div>
+            </div>
+
+            {/* Right-aligned actions */}
+            <div className="flex items-center gap-1 sm:gap-2">
+              {/* Settings Trigger */}
+              <div className="relative">
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setShowSettings(!showSettings);
+                  }}
+                  className={`p-2 hover:bg-white/10 rounded-full text-white transition ${
+                    showSettings ? "text-primary" : ""
+                  }`}
+                >
+                  <Settings className="h-4 w-4" />
+                </button>
+
+                {showSettings && (
+                  <div 
+                    onClick={(e) => e.stopPropagation()}
+                    className="absolute bottom-12 right-0 bg-black/95 backdrop-blur-md border border-white/10 rounded-xl p-2.5 w-36 shadow-2xl animate-fade-in flex flex-col gap-1 z-30"
+                  >
+                    <span className="text-[10px] font-bold text-text-muted px-2 py-1 uppercase tracking-wider">Speed</span>
+                    {[0.5, 1, 1.25, 1.5, 2].map((rate) => (
+                      <button
+                        key={rate}
+                        onClick={() => handleRateChange(rate)}
+                        className={`text-xs text-left px-2 py-1.5 rounded-lg hover:bg-white/10 transition ${
+                          playbackRate === rate ? "text-primary font-bold" : "text-white/80"
+                        }`}
+                      >
+                        {rate === 1 ? "Normal" : `${rate}x`}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Picture-in-Picture */}
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  togglePip();
+                }}
+                title="Picture in Picture"
+                className={`p-2 hover:bg-white/10 rounded-full text-white transition ${isPip ? "text-primary" : ""}`}
+              >
+                <MonitorPlay className="h-4 w-4" />
+              </button>
+
+              {/* Fullscreen */}
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  toggleFullscreen();
+                }}
+                className="p-2 hover:bg-white/10 rounded-full text-white transition"
+              >
+                <Maximize className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

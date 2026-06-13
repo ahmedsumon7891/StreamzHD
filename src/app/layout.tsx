@@ -48,10 +48,15 @@ export const viewport: Viewport = {
   viewportFit: "cover",
 };
 
+import { BottomNav } from "@/components/layout/BottomNav";
+
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" className={`${display.variable} ${body.variable}`}>
-      <body>{children}</body>
+      <body className="pb-16 md:pb-0 min-h-screen flex flex-col justify-between">
+        <div className="flex-grow">{children}</div>
+        <BottomNav />
+      </body>
     </html>
   );
 }
