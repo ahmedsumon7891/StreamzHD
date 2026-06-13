@@ -11,7 +11,7 @@ const VideoPlayer = dynamic(() => import("./VideoPlayer"), {
 });
 
 interface Props {
-  streamUrl: string;
+  channelSlug: string;
   channelName: string;
   logoUrl?: string | null;
 }

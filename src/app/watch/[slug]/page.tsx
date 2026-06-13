@@ -17,7 +17,7 @@ export const revalidate = 30;
 async function fetchChannel(slug: string) {
   const { data } = await supabasePublic
     .from("channels")
-    .select("*, category:categories(*), country:countries(*)")
+    .select("id, name, slug, logo_url, category_id, country_id, language, description, tags, is_featured, is_active, view_count, sort_order, epg_id, created_at, updated_at, category:categories(*), country:countries(*)")
     .eq("slug", slug)
     .eq("is_active", true)
     .maybeSingle();
@@ -58,7 +58,7 @@ export default async function WatchPage({ params }: { params: Promise<{ slug: st
       <Header />
       <ViewIncrement slug={channel.slug} />
       <main className="max-w-[1600px] mx-auto px-4 sm:px-6 py-6 space-y-8">
-        <ClientVideoPlayer streamUrl={channel.stream_url} channelName={channel.name} logoUrl={channel.logo_url} />
+        <ClientVideoPlayer channelSlug={channel.slug} channelName={channel.name} logoUrl={channel.logo_url} />
 
         <div className="grid md:grid-cols-[1fr,300px] gap-8">
           <div>

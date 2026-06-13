@@ -7,12 +7,12 @@ import type Player from "video.js/dist/types/player";
 import { Play, Pause, Volume2, VolumeX, Maximize, RotateCcw, MonitorPlay, Settings, Activity } from "lucide-react";
 
 interface Props {
-  streamUrl: string;
+  channelSlug: string;
   channelName: string;
   logoUrl?: string | null;
 }
 
-export default function VideoPlayer({ streamUrl, channelName, logoUrl }: Props) {
+export default function VideoPlayer({ channelSlug, channelName, logoUrl }: Props) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const playerRef = useRef<Player | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -32,25 +32,56 @@ export default function VideoPlayer({ streamUrl, channelName, logoUrl }: Props) 
   const [isLive, setIsLive] = useState(true);
   const controlsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
+  const [resolvedStreamUrl, setResolvedStreamUrl] = useState("");
+
   useEffect(() => {
-      if (!videoRef.current) return;
-      const isHls = /\.m3u8(\?|$)/i.test(streamUrl);
+    let active = true;
+    async function resolveStream() {
+      setIsLoading(true);
       setHasError(false);
-      setErrorMessage("");
-  
-      // Initial setup with videojs
-      const player = videojs(videoRef.current, {
-        controls: false, // Turn off default controls to use our own
-        autoplay: true,
-        preload: "auto",
-        fluid: true,
-        responsive: true,
-        html5: { vhs: { overrideNative: true } },
-        sources: [{ src: streamUrl, type: isHls ? "application/x-mpegURL" : "video/mp4" }],
-        poster: logoUrl || undefined,
-      });
-  
-      playerRef.current = player;
+      try {
+        const res = await fetch(`/api/channels/resolve?slug=${channelSlug}`);
+        const data = await res.json();
+        if (!active) return;
+        if (data.streamUrl) {
+          setResolvedStreamUrl(data.streamUrl);
+        } else {
+          setHasError(true);
+          setErrorMessage("Failed to resolve stream URL.");
+          setIsLoading(false);
+        }
+      } catch (err) {
+        if (!active) return;
+        setHasError(true);
+        setErrorMessage("Network issue resolving stream location.");
+        setIsLoading(false);
+      }
+    }
+    resolveStream();
+    return () => {
+      active = false;
+    };
+  }, [channelSlug]);
+
+  useEffect(() => {
+    if (!videoRef.current || !resolvedStreamUrl) return;
+    const isHls = /\.m3u8(\?|$)/i.test(resolvedStreamUrl);
+    setHasError(false);
+    setErrorMessage("");
+
+    // Initial setup with videojs
+    const player = videojs(videoRef.current, {
+      controls: false, // Turn off default controls to use our own
+      autoplay: true,
+      preload: "auto",
+      fluid: true,
+      responsive: true,
+      html5: { vhs: { overrideNative: true } },
+      sources: [{ src: resolvedStreamUrl, type: isHls ? "application/x-mpegURL" : "video/mp4" }],
+      poster: logoUrl || undefined,
+    });
+
+    playerRef.current = player;
   
       player.on("play", () => {
         setIsPlaying(true);
@@ -86,7 +117,7 @@ export default function VideoPlayer({ streamUrl, channelName, logoUrl }: Props) 
         if (retries < 3) {
           setTimeout(() => {
             setRetries((r) => r + 1);
-            player.src({ src: streamUrl, type: isHls ? "application/x-mpegURL" : "video/mp4" });
+            player.src({ src: resolvedStreamUrl, type: isHls ? "application/x-mpegURL" : "video/mp4" });
             player.play()?.catch(() => undefined);
           }, 3000);
         }
@@ -128,7 +159,7 @@ export default function VideoPlayer({ streamUrl, channelName, logoUrl }: Props) 
       }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [streamUrl]);
+  }, [resolvedStreamUrl]);
 
   // Autohide controls logic
   const triggerShowControls = () => {
@@ -210,8 +241,8 @@ export default function VideoPlayer({ streamUrl, channelName, logoUrl }: Props) 
   const handleReload = () => {
     if (!playerRef.current) return;
     setIsLoading(true);
-    const isHls = /\.m3u8(\?|$)/i.test(streamUrl);
-    playerRef.current.src({ src: streamUrl, type: isHls ? "application/x-mpegURL" : "video/mp4" });
+    const isHls = /\.m3u8(\?|$)/i.test(resolvedStreamUrl);
+    playerRef.current.src({ src: resolvedStreamUrl, type: isHls ? "application/x-mpegURL" : "video/mp4" });
     playerRef.current.play()?.catch(() => undefined);
     triggerShowControls();
   };
