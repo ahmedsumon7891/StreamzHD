@@ -25,54 +25,72 @@ export default function VideoPlayer({ streamUrl, channelName, logoUrl }: Props) 
   const [isPip, setIsPip] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [playbackRate, setPlaybackRate] = useState(1);
+  const [hasError, setHasError] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
   const [retries, setRetries] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [isLive, setIsLive] = useState(true);
   const controlsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
-    if (!videoRef.current) return;
-    const isHls = /\.m3u8(\?|$)/i.test(streamUrl);
+      if (!videoRef.current) return;
+      const isHls = /\.m3u8(\?|$)/i.test(streamUrl);
+      setHasError(false);
+      setErrorMessage("");
+  
+      // Initial setup with videojs
+      const player = videojs(videoRef.current, {
+        controls: false, // Turn off default controls to use our own
+        autoplay: true,
+        preload: "auto",
+        fluid: true,
+        responsive: true,
+        html5: { vhs: { overrideNative: true } },
+        sources: [{ src: streamUrl, type: isHls ? "application/x-mpegURL" : "video/mp4" }],
+        poster: logoUrl || undefined,
+      });
+  
+      playerRef.current = player;
+  
+      player.on("play", () => {
+        setIsPlaying(true);
+        setIsLoading(false);
+        setHasError(false);
+      });
+      player.on("pause", () => setIsPlaying(false));
+      player.on("volumechange", () => {
+        setIsMuted(player.muted() || false);
+        setVolume(player.volume() || 0);
+      });
+      player.on("waiting", () => setIsLoading(true));
+      player.on("playing", () => setIsLoading(false));
+      player.on("ratechange", () => setPlaybackRate(player.playbackRate() || 1));
+      player.on("fullscreenchange", () => setIsFullscreen(player.isFullscreen() || false));
+      player.on("enterpictureinpicture", () => setIsPip(true));
+      player.on("leavepictureinpicture", () => setIsPip(false));
+  
+      player.on("error", () => {
+        const err = player.error();
+        console.error("VideoJS error:", err);
+        setIsLoading(false);
+        setHasError(true);
+        
+        let msg = "The stream could not be loaded due to a network or server issue.";
+        if (err?.code === 4) {
+          msg = "Stream format is unsupported, or access was blocked by CORS restrictions.";
+        } else if (err?.code === 2) {
+          msg = "A network error occurred while downloading the stream playlist.";
+        }
+        setErrorMessage(msg);
 
-    // Initial setup with videojs
-    const player = videojs(videoRef.current, {
-      controls: false, // Turn off default controls to use our own
-      autoplay: true,
-      preload: "auto",
-      fluid: true,
-      responsive: true,
-      html5: { vhs: { overrideNative: true } },
-      sources: [{ src: streamUrl, type: isHls ? "application/x-mpegURL" : "video/mp4" }],
-      poster: logoUrl || undefined,
-    });
-
-    playerRef.current = player;
-
-    player.on("play", () => {
-      setIsPlaying(true);
-      setIsLoading(false);
-    });
-    player.on("pause", () => setIsPlaying(false));
-    player.on("volumechange", () => {
-      setIsMuted(player.muted() || false);
-      setVolume(player.volume() || 0);
-    });
-    player.on("waiting", () => setIsLoading(true));
-    player.on("playing", () => setIsLoading(false));
-    player.on("ratechange", () => setPlaybackRate(player.playbackRate() || 1));
-    player.on("fullscreenchange", () => setIsFullscreen(player.isFullscreen() || false));
-    player.on("enterpictureinpicture", () => setIsPip(true));
-    player.on("leavepictureinpicture", () => setIsPip(false));
-
-    player.on("error", () => {
-      if (retries < 3) {
-        setTimeout(() => {
-          setRetries((r) => r + 1);
-          player.src({ src: streamUrl, type: isHls ? "application/x-mpegURL" : "video/mp4" });
-          player.play()?.catch(() => undefined);
-        }, 3000);
-      }
-    });
+        if (retries < 3) {
+          setTimeout(() => {
+            setRetries((r) => r + 1);
+            player.src({ src: streamUrl, type: isHls ? "application/x-mpegURL" : "video/mp4" });
+            player.play()?.catch(() => undefined);
+          }, 3000);
+        }
+      });
 
     // Handle initial state
     player.ready(() => {
@@ -231,14 +249,33 @@ export default function VideoPlayer({ streamUrl, channelName, logoUrl }: Props) 
       <div 
         onClick={(e) => {
           e.stopPropagation();
-          togglePlay();
+          if (!hasError) togglePlay();
         }}
         className="absolute inset-0 z-10 flex items-center justify-center cursor-pointer bg-gradient-to-t from-black/40 via-transparent to-black/25"
       >
-        {isLoading && (
+        {isLoading && !hasError && (
           <div className="flex flex-col items-center gap-3 bg-black/60 backdrop-blur-md px-6 py-4 rounded-2xl border border-white/10 animate-fade-in">
             <Activity className="h-8 w-8 text-primary animate-pulse" />
             <span className="text-xs font-semibold tracking-wider text-text-muted">CONNECTING STREAM</span>
+          </div>
+        )}
+        
+        {hasError && (
+          <div className="flex flex-col items-center gap-4 bg-black/80 backdrop-blur-md max-w-md mx-4 p-6 rounded-2xl border border-red-500/20 text-center animate-fade-in pointer-events-auto">
+            <div className="h-12 w-12 rounded-full bg-red-500/10 flex items-center justify-center text-red-500 mb-1">
+              <RotateCcw className="h-6 w-6 animate-spin-reverse" />
+            </div>
+            <div className="text-sm font-semibold text-white">Stream Loading Failed</div>
+            <div className="text-xs text-text-muted leading-relaxed">{errorMessage}</div>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                handleReload();
+              }}
+              className="mt-2 px-4 py-2 bg-primary hover:bg-primary/95 text-white text-xs font-semibold rounded-lg transition"
+            >
+              Retry Connection
+            </button>
           </div>
         )}
       </div>
