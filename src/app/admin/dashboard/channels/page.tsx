@@ -63,8 +63,9 @@ export default function ChannelsPage() {
                 <td className="p-3 text-right">{r.view_count.toLocaleString()}</td>
                 <td className="p-3 text-center"><input type="checkbox" checked={r.is_active} onChange={(e) => toggle(r.id, "is_active", e.target.checked)} /></td>
                 <td className="p-3 text-center"><input type="checkbox" checked={r.is_featured} onChange={(e) => toggle(r.id, "is_featured", e.target.checked)} /></td>
-                <td className="p-3 flex justify-end gap-2">
+                <td className="p-3 flex justify-end gap-3 items-center">
                   <Link href={`/watch/${r.slug}`} target="_blank" className="text-xs text-text-muted hover:text-primary">View</Link>
+                  <Link href={`/admin/dashboard/channels/edit/${r.id}`} className="text-text-muted hover:text-primary"><Pencil className="h-4 w-4" /></Link>
                   <button onClick={() => remove(r.id)} className="text-error hover:opacity-80"><Trash2 className="h-4 w-4" /></button>
                 </td>
               </tr>
