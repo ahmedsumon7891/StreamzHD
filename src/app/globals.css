@@ -1,0 +1,63 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg: #050505;
+  --card: #111111;
+  --card-hover: #1a1a1a;
+  --border: #222222;
+  --primary: #ff6a00;
+  --primary-dark: #cc5500;
+  --text: #ffffff;
+  --text-muted: #888888;
+  --text-dim: #555555;
+  --success: #22c55e;
+  --error: #ef4444;
+  --warning: #f59e0b;
+}
+
+* { box-sizing: border-box; }
+html, body { background: var(--bg); color: var(--text); }
+body { font-family: var(--font-body), system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
+h1,h2,h3,h4,h5 { font-family: var(--font-display), system-ui, sans-serif; letter-spacing: -0.01em; }
+
+::selection { background: var(--primary); color: #fff; }
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: #0a0a0a; }
+::-webkit-scrollbar-thumb { background: #222; border-radius: 5px; }
+::-webkit-scrollbar-thumb:hover { background: #333; }
+
+/* Hide native focus rings, keep our own */
+button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+/* Video.js theming */
+.video-js {
+  width: 100% !important;
+  height: 100% !important;
+  background: #000;
+}
+.video-js .vjs-big-play-button {
+  background: var(--primary);
+  border: none;
+  border-radius: 9999px;
+  width: 80px;
+  height: 80px;
+  line-height: 80px;
+  font-size: 40px;
+  top: 50%;
+  left: 50%;
+  margin-left: -40px;
+  margin-top: -40px;
+}
+.video-js .vjs-control-bar { background: linear-gradient(180deg, transparent, rgba(0,0,0,0.85)); }
+.video-js .vjs-play-progress, .video-js .vjs-volume-level { background: var(--primary); }
+
+/* Skeleton */
+.skeleton { background: linear-gradient(90deg, #111 0%, #1a1a1a 50%, #111 100%); background-size: 200% 100%; animation: shimmer 1.5s infinite; }
+@keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }

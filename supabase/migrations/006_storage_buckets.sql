@@ -1,0 +1,10 @@
+-- Create storage buckets via Supabase dashboard or CLI:
+--   supabase storage create logos --public
+--   supabase storage create sliders --public
+--   supabase storage create categories --public
+--   supabase storage create countries --public
+--   supabase storage create media --public
+--
+-- Storage policies (apply in dashboard for each bucket):
+--   - Allow public SELECT (anon)
+--   - Allow INSERT/DELETE only with service_role (server-side)

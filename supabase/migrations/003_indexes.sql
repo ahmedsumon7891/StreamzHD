@@ -1,0 +1,10 @@
+create index idx_channels_slug on channels(slug);
+create index idx_channels_category on channels(category_id);
+create index idx_channels_country on channels(country_id);
+create index idx_channels_featured on channels(is_featured) where is_featured = true;
+create index idx_channels_active on channels(is_active) where is_active = true;
+create index idx_channels_views on channels(view_count desc);
+create index idx_channel_views_date on channel_views(viewed_at);
+create index idx_channel_views_channel on channel_views(channel_id);
+create index idx_ads_position on advertisements(position);
+create index idx_activity_logs_created on activity_logs(created_at desc);
