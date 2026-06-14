@@ -62,6 +62,15 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try { await requireAdmin(req); } catch (r) { return r as Response; }
 
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  console.log("Sync API check - service key length:", serviceKey?.length, "anon key length:", anonKey?.length);
+  if (!serviceKey) {
+    console.error("ERROR: SUPABASE_SERVICE_ROLE_KEY is undefined/empty!");
+  } else if (serviceKey === anonKey) {
+    console.error("WARNING: SUPABASE_SERVICE_ROLE_KEY is identical to NEXT_PUBLIC_SUPABASE_ANON_KEY. RLS will NOT be bypassed!");
+  }
+
   const body = await req.json().catch(() => ({}));
   const playlistId = body?.playlist_id; // Option to sync a single playlist
 
