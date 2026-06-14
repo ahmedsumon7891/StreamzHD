@@ -64,11 +64,13 @@ export async function POST(req: NextRequest) {
 
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
   const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  console.log("Sync API check - service key length:", serviceKey?.length, "anon key length:", anonKey?.length);
-  if (!serviceKey) {
-    console.error("ERROR: SUPABASE_SERVICE_ROLE_KEY is undefined/empty!");
-  } else if (serviceKey === anonKey) {
-    console.error("WARNING: SUPABASE_SERVICE_ROLE_KEY is identical to NEXT_PUBLIC_SUPABASE_ANON_KEY. RLS will NOT be bypassed!");
+  
+  if (!serviceKey || serviceKey === "undefined") {
+    return jsonError("Backend Configuration Error: SUPABASE_SERVICE_ROLE_KEY is undefined or empty. Please check your .env.local file and restart the development server.", 500);
+  }
+  
+  if (serviceKey === anonKey) {
+    return jsonError("Backend Configuration Error: SUPABASE_SERVICE_ROLE_KEY is identical to NEXT_PUBLIC_SUPABASE_ANON_KEY. The sync engine requires the Service Role Key to bypass RLS.", 500);
   }
 
   const body = await req.json().catch(() => ({}));
