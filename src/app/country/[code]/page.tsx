@@ -14,8 +14,10 @@ export async function generateMetadata({ params }: { params: Promise<{ code: str
   if (!data) return { title: "Country not found" };
   const title = `${data.name} Channels — Live HD Streaming`;
   const description = `Watch live channels from ${data.name} in HD. Free streaming on StreamZ HD.`;
-  return { title, description, alternates: { canonical: `/country/${code}` },
-    openGraph: { title, description }, twitter: { card: "summary", title, description } };
+  return {
+    title, description, alternates: { canonical: `/country/${code}` },
+    openGraph: { title, description }, twitter: { card: "summary", title, description }
+  };
 }
 
 export default async function CountryPage({ params }: { params: Promise<{ code: string }> }) {

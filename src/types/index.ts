@@ -34,6 +34,7 @@ export interface Country {
   id: string;
   name: string;
   code: string;
+  flag_emoji?: string | null;
   image_url: string | null;
   sort_order: number;
   created_at: string;

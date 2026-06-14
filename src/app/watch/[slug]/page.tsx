@@ -97,7 +97,12 @@ export default async function WatchPage({ params }: { params: Promise<{ slug: st
                 <h1 className="text-2xl sm:text-3xl font-display font-bold">{channel.name}</h1>
                 <div className="flex flex-wrap gap-2 mt-2 text-xs text-text-muted">
                   {channel.category && <Link href={`/category/${channel.category.slug}`} className="bg-card border border-border px-2 py-1 rounded hover:border-primary">{channel.category.name}</Link>}
-                  {channel.country && <Link href={`/country/${channel.country.code}`} className="bg-card border border-border px-2 py-1 rounded hover:border-primary">{channel.country.name}</Link>}
+                  {channel.country && (
+                    <Link href={`/country/${channel.country.code}`} className="bg-card border border-border px-2 py-1 rounded hover:border-primary flex items-center gap-1.5">
+                      <span>{channel.country.flag_emoji || flagEmoji(channel.country.code)}</span>
+                      <span>{channel.country.name}</span>
+                    </Link>
+                  )}
                   {channel.language && <span className="bg-card border border-border px-2 py-1 rounded">{channel.language}</span>}
                   <span className="bg-card border border-border px-2 py-1 rounded">{channel.view_count.toLocaleString()} views</span>
                 </div>
@@ -125,4 +130,10 @@ export default async function WatchPage({ params }: { params: Promise<{ slug: st
       <Footer />
     </>
   );
+}
+
+function flagEmoji(code: string): string {
+  if (!code || code.length !== 2) return "🌍";
+  const cps = code.toUpperCase().split("").map((c) => 127397 + c.charCodeAt(0));
+  return String.fromCodePoint(...cps);
 }
