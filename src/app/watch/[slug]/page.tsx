@@ -1,5 +1,4 @@
 import { notFound } from "next/navigation";
-import Image from "next/image";
 import Link from "next/link";
 import type { Metadata } from "next";
 import { supabasePublic } from "@/lib/supabase/server";
@@ -90,7 +89,7 @@ export default async function WatchPage({ params }: { params: Promise<{ slug: st
             <div className="flex items-start gap-4">
               {channel.logo_url && (
                 <div className="relative h-16 w-16 bg-black rounded-lg flex-shrink-0 overflow-hidden border border-border">
-                  <Image src={channel.logo_url} alt={channel.name} fill className="object-contain p-2" />
+                  <img src={channel.logo_url} alt={channel.name} className="absolute inset-0 w-full h-full object-contain p-2" loading="lazy" />
                 </div>
               )}
               <div className="flex-1 min-w-0">

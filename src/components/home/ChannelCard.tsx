@@ -1,5 +1,4 @@
 "use client";
-import Image from "next/image";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { Play, Radio } from "lucide-react";
@@ -14,12 +13,11 @@ export function ChannelCard({ channel }: { channel: Channel }) {
       >
         <div className="relative aspect-video bg-black flex items-center justify-center overflow-hidden">
           {channel.logo_url ? (
-            <Image
+            <img
               src={channel.logo_url}
               alt={channel.name}
-              fill
-              sizes="(max-width:768px) 50vw, 25vw"
-              className="object-contain p-3 group-hover:scale-105 transition-transform duration-300"
+              className="absolute inset-0 w-full h-full object-contain p-3 group-hover:scale-105 transition-transform duration-300"
+              loading="lazy"
             />
           ) : (
             <Radio className="h-10 w-10 text-text-dim" />
