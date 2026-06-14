@@ -81,11 +81,21 @@ export async function POST(req: NextRequest) {
     const { data: categories } = await supabaseAdmin.from("categories").select("id, name, slug");
     const { data: countries } = await supabaseAdmin.from("countries").select("id, name, code");
 
-    const catMap = new Map<string, string>(); // slug -> id
-    const countryMap = new Map<string, string>(); // code -> id
+    const catMap = new Map<string, string>(); // slug and lowercase name -> id
+    const countryMap = new Map<string, string>(); // code and lowercase name -> id
 
-    categories?.forEach((c) => catMap.set(c.slug, c.id));
-    countries?.forEach((c) => countryMap.set(c.code.toUpperCase(), c.id));
+    categories?.forEach((c) => {
+      catMap.set(c.slug, c.id);
+      catMap.set(c.name.toLowerCase(), c.id);
+    });
+
+    countries?.forEach((c) => {
+      const uppercaseCode = c.code.toUpperCase();
+      countryMap.set(uppercaseCode, c.id);
+      if (uppercaseCode === "GB") countryMap.set("UK", c.id);
+      if (uppercaseCode === "UK") countryMap.set("GB", c.id);
+      countryMap.set(c.name.toLowerCase(), c.id);
+    });
 
     let totalImported = 0;
     const logs: string[] = [];
@@ -170,6 +180,72 @@ export async function POST(req: NextRequest) {
         }
       }
 
+      // 1. Resolve missing categories dynamically from group-titles
+      const missingCatNames = new Set<string>();
+      for (const c of parsed) {
+        if (c.group) {
+          const groups = c.group.split(";").map(g => g.trim()).filter(Boolean);
+          const groupName = groups[0];
+          if (groupName) {
+            const slug = generateSlug(groupName);
+            if (slug && !catMap.has(slug)) {
+              missingCatNames.add(groupName);
+            }
+          }
+        }
+      }
+
+      if (missingCatNames.size > 0) {
+        const newCatsPayload = Array.from(missingCatNames).map((name) => ({
+          name,
+          slug: generateSlug(name) || `cat-${Math.random().toString(36).slice(2, 8)}`,
+          sort_order: 0,
+        }));
+        const { data: createdCats } = await supabaseAdmin
+          .from("categories")
+          .insert(newCatsPayload)
+          .select("id, name, slug");
+        if (createdCats) {
+          for (const c of createdCats) {
+            catMap.set(c.slug, c.id);
+            logs.push(`Dynamically created category: ${c.name}`);
+          }
+        }
+      }
+
+      // 2. Resolve missing countries dynamically from tvg-country attributes
+      const missingCountryCodes = new Set<string>();
+      for (const c of parsed) {
+        if (c.country) {
+          const code = c.country.trim().toUpperCase();
+          if (code && !countryMap.has(code)) {
+            missingCountryCodes.add(code);
+          }
+        }
+      }
+
+      if (missingCountryCodes.size > 0) {
+        const newCountriesPayload = Array.from(missingCountryCodes).map((code) => {
+          const meta = COUNTRY_METADATA[code] || { name: code, flag: "" };
+          return {
+            name: meta.name,
+            code,
+            flag_emoji: meta.flag || null,
+            sort_order: 0
+          };
+        });
+        const { data: createdCountries } = await supabaseAdmin
+          .from("countries")
+          .insert(newCountriesPayload)
+          .select("id, name, code");
+        if (createdCountries) {
+          for (const c of createdCountries) {
+            countryMap.set(c.code.toUpperCase(), c.id);
+            logs.push(`Dynamically created country: ${c.name} (${c.code})`);
+          }
+        }
+      }
+
       // Prepare channels payload
       const seenSlugs = new Set<string>();
       const channelRows = parsed
@@ -218,9 +294,34 @@ export async function POST(req: NextRequest) {
       const CHUNK = 100;
       for (let i = 0; i < channelRows.length; i += CHUNK) {
         const chunk = channelRows.slice(i, i + CHUNK);
+        
+        // 1. Fetch existing channels in this chunk to merge metadata
+        const { data: existingChannels } = await supabaseAdmin
+          .from("channels")
+          .select("id, slug, category_id, country_id, logo_url, language, epg_id")
+          .in("slug", chunk.map(c => c.slug));
+
+        const existingMap = new Map(existingChannels?.map(e => [e.slug, e]) || []);
+
+        // 2. Merge non-null fields to avoid overwriting existing categorization with nulls
+        const mergedChunk = chunk.map(c => {
+          const existing = existingMap.get(c.slug);
+          if (existing) {
+            return {
+              ...c,
+              category_id: c.category_id || existing.category_id,
+              country_id: c.country_id || existing.country_id,
+              logo_url: c.logo_url || existing.logo_url,
+              language: c.language || existing.language,
+              epg_id: c.epg_id || existing.epg_id,
+            };
+          }
+          return c;
+        });
+
         const { data, error: upsertError } = await supabaseAdmin
           .from("channels")
-          .upsert(chunk, { onConflict: "slug", ignoreDuplicates: false })
+          .upsert(mergedChunk, { onConflict: "slug", ignoreDuplicates: false })
           .select("id");
 
         if (upsertError) {
