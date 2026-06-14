@@ -9,6 +9,14 @@ export async function GET(req: NextRequest) {
     return new Response("URL parameter is required", { status: 400 });
   }
 
+  // Quick check: If the URL is clearly a video chunk/segment (.ts, .mp4, etc.) and not a playlist,
+  // redirect immediately to the source to avoid downloading/proxying heavy binary data.
+  const lowerUrl = url.toLowerCase();
+  const isSegment = lowerUrl.includes(".ts") || lowerUrl.includes(".mp4") || lowerUrl.includes(".m4s") || lowerUrl.includes(".aac");
+  if (isSegment && !lowerUrl.includes(".m3u8")) {
+    return Response.redirect(url, 307);
+  }
+
   try {
     const targetUrl = new URL(url);
     const response = await fetch(url, {
@@ -32,8 +40,15 @@ export async function GET(req: NextRequest) {
       headers.set("content-type", contentType);
     }
 
-    // If it's an M3U8 playlist, we need to rewrite relative segment chunk URLs
-    if (contentType.includes("mpegurl") || contentType.includes("application/x-mpegURL") || url.endsWith(".m3u8") || url.includes(".m3u8")) {
+    const isPlaylist = 
+      contentType.includes("mpegurl") || 
+      contentType.includes("application/x-mpegURL") || 
+      url.endsWith(".m3u8") || 
+      url.includes(".m3u8");
+
+    // If it's an M3U8 playlist, rewrite only sub-playlist URLs (.m3u8) to use the proxy.
+    // Keep segment URLs (.ts, etc.) pointing directly to the upstream server to save bandwidth.
+    if (isPlaylist) {
       const playlistText = await response.text();
       const baseUrl = targetUrl.origin + targetUrl.pathname.substring(0, targetUrl.pathname.lastIndexOf("/") + 1);
 
@@ -52,7 +67,11 @@ export async function GET(req: NextRequest) {
                   absoluteSubUrl = `${baseUrl}${subUrl}`;
                 }
               }
-              return `URI="/api/channels/proxy?url=${encodeURIComponent(absoluteSubUrl)}"`;
+              // Only proxy sub-playlists, not segment keys or other files
+              if (absoluteSubUrl.includes(".m3u8")) {
+                return `URI="/api/channels/proxy?url=${encodeURIComponent(absoluteSubUrl)}"`;
+              }
+              return `URI="${absoluteSubUrl}"`;
             });
           }
           return line;
@@ -60,7 +79,10 @@ export async function GET(req: NextRequest) {
 
         // Absolute URL
         if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) {
-          return `/api/channels/proxy?url=${encodeURIComponent(trimmed)}`;
+          if (trimmed.includes(".m3u8")) {
+            return `/api/channels/proxy?url=${encodeURIComponent(trimmed)}`;
+          }
+          return trimmed; // Serve segments directly
         }
 
         // Relative URL
@@ -71,7 +93,10 @@ export async function GET(req: NextRequest) {
           absoluteSegmentUrl = `${baseUrl}${trimmed}`;
         }
 
-        return `/api/channels/proxy?url=${encodeURIComponent(absoluteSegmentUrl)}`;
+        if (absoluteSegmentUrl.includes(".m3u8")) {
+          return `/api/channels/proxy?url=${encodeURIComponent(absoluteSegmentUrl)}`;
+        }
+        return absoluteSegmentUrl; // Serve segments directly
       });
 
       return new Response(rewrittenLines.join("\n"), {
@@ -80,11 +105,8 @@ export async function GET(req: NextRequest) {
       });
     }
 
-    // For raw video files/segments (.ts), pipe the binary stream directly
-    return new Response(response.body, {
-      status: 200,
-      headers,
-    });
+    // Fallback: If it's not a playlist (e.g. video segments, images, etc.), redirect to avoid bandwidth usage
+    return Response.redirect(url, 307);
   } catch (err) {
     console.error("Stream Proxy Error:", err);
     return new Response("Error connecting to stream source", { status: 502 });

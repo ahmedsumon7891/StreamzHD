@@ -71,6 +71,10 @@ export default function VideoPlayer({ channelSlug, channelName, logoUrl }: Props
     setHasError(false);
     setErrorMessage("");
 
+    const ua = typeof navigator !== "undefined" ? navigator.userAgent.toLowerCase() : "";
+    const isTV = /smarttv|googletv|appletv|tizen|webos|hbbtv|roku|firetv|tv/i.test(ua);
+    const isSafari = /safari/i.test(ua) && !/chrome/i.test(ua);
+
     // Initial setup with videojs
     const player = videojs(videoRef.current, {
       controls: false, // Turn off default controls to use our own
@@ -78,7 +82,13 @@ export default function VideoPlayer({ channelSlug, channelName, logoUrl }: Props
       preload: "auto",
       fluid: true,
       responsive: true,
-      html5: { vhs: { overrideNative: true } },
+      html5: { 
+        vhs: { 
+          // Disable overrideNative on TVs and Safari to allow hardware-accelerated HLS native decoding.
+          // This resolves the common "audio only, no video" (black screen) issue on Smart TVs.
+          overrideNative: !isTV && !isSafari 
+        } 
+      },
       sources: [{ src: resolvedStreamUrl, type: isHls ? "application/x-mpegURL" : "video/mp4" }],
       poster: logoUrl || undefined,
     });
