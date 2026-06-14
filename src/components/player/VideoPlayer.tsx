@@ -30,6 +30,8 @@ export default function VideoPlayer({ channelSlug, channelName, logoUrl }: Props
   const [retries, setRetries] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [isLive, setIsLive] = useState(true);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(0);
   const controlsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const [resolvedStreamUrl, setResolvedStreamUrl] = useState("");
@@ -108,7 +110,14 @@ export default function VideoPlayer({ channelSlug, channelName, logoUrl }: Props
       player.on("waiting", () => setIsLoading(true));
       player.on("playing", () => setIsLoading(false));
       player.on("ratechange", () => setPlaybackRate(player.playbackRate() || 1));
-      player.on("fullscreenchange", () => setIsFullscreen(player.isFullscreen() || false));
+      player.on("timeupdate", () => {
+        setCurrentTime(player.currentTime() || 0);
+      });
+      player.on("durationchange", () => {
+        const d = player.duration() || 0;
+        setDuration(d);
+        setIsLive(d === Infinity || d === 0);
+      });
       player.on("enterpictureinpicture", () => setIsPip(true));
       player.on("leavepictureinpicture", () => setIsPip(false));
   
@@ -148,6 +157,14 @@ export default function VideoPlayer({ channelSlug, channelName, logoUrl }: Props
       });
     });
 
+    const onFullscreenChange = () => {
+      setIsFullscreen(document.fullscreenElement === containerRef.current);
+    };
+    document.addEventListener("fullscreenchange", onFullscreenChange);
+    document.addEventListener("webkitfullscreenchange", onFullscreenChange);
+    document.addEventListener("mozfullscreenchange", onFullscreenChange);
+    document.addEventListener("MSFullscreenChange", onFullscreenChange);
+
     const onKey = (e: KeyboardEvent) => {
       const tag = (e.target as HTMLElement)?.tagName;
       if (tag === "INPUT" || tag === "TEXTAREA") return;
@@ -170,6 +187,10 @@ export default function VideoPlayer({ channelSlug, channelName, logoUrl }: Props
 
     return () => {
       window.removeEventListener("keydown", onKey);
+      document.removeEventListener("fullscreenchange", onFullscreenChange);
+      document.removeEventListener("webkitfullscreenchange", onFullscreenChange);
+      document.removeEventListener("mozfullscreenchange", onFullscreenChange);
+      document.removeEventListener("MSFullscreenChange", onFullscreenChange);
       if (playerRef.current) {
         playerRef.current.dispose();
         playerRef.current = null;
@@ -227,16 +248,26 @@ export default function VideoPlayer({ channelSlug, channelName, logoUrl }: Props
     triggerShowControls();
   };
 
-  const toggleFullscreen = () => {
-    if (!playerRef.current) return;
-    if (playerRef.current.isFullscreen()) {
-      playerRef.current.exitFullscreen();
-      setIsFullscreen(false);
-    } else {
-      playerRef.current.requestFullscreen();
-      setIsFullscreen(true);
+  const toggleFullscreen = async () => {
+    const container = containerRef.current;
+    if (!container) return;
+    try {
+      if (document.fullscreenElement) {
+        await document.exitFullscreen();
+      } else {
+        if (container.requestFullscreen) {
+          await container.requestFullscreen();
+        } else if ((container as any).webkitRequestFullscreen) {
+          await (container as any).webkitRequestFullscreen();
+        } else if ((container as any).mozRequestFullScreen) {
+          await (container as any).mozRequestFullScreen();
+        } else if ((container as any).msRequestFullscreen) {
+          await (container as any).msRequestFullscreen();
+        }
+      }
+    } catch (err) {
+      console.error("Fullscreen error:", err);
     }
-    triggerShowControls();
   };
 
   const togglePip = async () => {
@@ -295,8 +326,24 @@ export default function VideoPlayer({ channelSlug, channelName, logoUrl }: Props
       onMouseMove={handleMouseMove}
       onMouseLeave={handleMouseLeave}
       onClick={triggerShowControls}
-      className="group relative w-full aspect-video bg-black md:rounded-xl rounded-none overflow-hidden border-y md:border border-border/80 select-none shadow-2xl shadow-primary/5"
+      className={`group relative bg-black select-none shadow-2xl transition-all duration-300 ${
+        isFullscreen 
+          ? "fixed inset-0 w-screen h-screen z-[9999] rounded-none border-none" 
+          : "w-full aspect-video md:rounded-xl rounded-none border-y md:border border-border/80 shadow-primary/5"
+      }`}
     >
+      {/* Dynamic styles to override Video.js aspect ratio rules in fullscreen */}
+      <style dangerouslySetInnerHTML={{ __html: `
+        .video-js {
+          width: 100% !important;
+          height: 100% !important;
+          padding-top: 0 !important;
+        }
+        .vjs-tech {
+          position: relative !important;
+          object-fit: contain !important;
+        }
+      ` }} />
       {/* Video element */}
       <div className="w-full h-full pointer-events-none" data-vjs-player>
         <video
@@ -380,11 +427,26 @@ export default function VideoPlayer({ channelSlug, channelName, logoUrl }: Props
 
         {/* Bottom controls panel */}
         <div className="w-full bg-gradient-to-t from-black/90 via-black/40 to-transparent px-3 pb-2 pt-6 pointer-events-auto flex flex-col gap-1.5">
-          {/* YouTube-style Progress/Live seekbar representation */}
-          <div className="w-full h-1 bg-white/20 relative group/progress mb-1 cursor-pointer">
-            <div className="absolute top-0 left-0 h-full w-full bg-primary" />
-            <div className="absolute right-0 top-1/2 -translate-y-1/2 w-3 h-3 rounded-full bg-primary opacity-0 group-hover/progress:opacity-100 transition-opacity" />
-          </div>
+          {/* Seekbar for VOD streams */}
+          {!isLive && duration > 0 && (
+            <div 
+              onClick={(e) => {
+                e.stopPropagation();
+                const rect = e.currentTarget.getBoundingClientRect();
+                const clickX = e.clientX - rect.left;
+                const percent = clickX / rect.width;
+                if (playerRef.current) {
+                  playerRef.current.currentTime(percent * duration);
+                }
+              }}
+              className="w-full h-1 bg-white/20 relative group/progress mb-2 cursor-pointer rounded-full overflow-hidden hover:h-1.5 transition-all"
+            >
+              <div 
+                className="absolute top-0 left-0 h-full bg-primary rounded-full transition-all duration-100" 
+                style={{ width: `${(currentTime / duration) * 100}%` }}
+              />
+            </div>
+          )}
 
           <div className="flex items-center justify-between gap-4">
             <div className="flex items-center gap-3">
