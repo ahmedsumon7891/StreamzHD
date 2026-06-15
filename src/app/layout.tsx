@@ -38,6 +38,9 @@ export const metadata: Metadata = {
   },
   robots: { index: true, follow: true },
   formatDetection: { telephone: false, email: false, address: false },
+  other: {
+    monetag: "45066a6fddff741f2da54666044de8d2",
+  },
 };
 
 export const viewport: Viewport = {
