@@ -2,7 +2,7 @@ import type { MetadataRoute } from "next";
 import { supabasePublic } from "@/lib/supabase/server";
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const base = process.env.NEXT_PUBLIC_APP_URL || "";
+  const base = (process.env.NEXT_PUBLIC_APP_URL || "").replace(/\/+$/, "");
   const out: MetadataRoute.Sitemap = [
     { url: `${base}/`, changeFrequency: "daily", priority: 1 },
     { url: `${base}/search`, changeFrequency: "weekly", priority: 0.5 },

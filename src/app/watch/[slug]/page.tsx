@@ -73,7 +73,8 @@ export default async function WatchPage({ params }: { params: Promise<{ slug: st
     }
   }
 
-  const url = `${process.env.NEXT_PUBLIC_APP_URL || ""}/watch/${channel.slug}`;
+  const baseUrl = (process.env.NEXT_PUBLIC_APP_URL || "").replace(/\/+$/, "");
+  const url = `${baseUrl}/watch/${channel.slug}`;
 
   return (
     <>
