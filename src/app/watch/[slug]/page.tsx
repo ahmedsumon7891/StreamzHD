@@ -131,7 +131,7 @@ export default async function WatchPage({ params }: { params: Promise<{ slug: st
           <ClientVideoPlayer channelSlug={channel.slug} channelName={channel.name} logoUrl={channel.logo_url} />
         </div>
 
-        <div className="grid md:grid-cols-[1fr,300px] gap-8">
+        <div className="grid md:grid-cols-[1fr,360px] gap-8">
           <div>
             <div className="flex items-start gap-4">
               {channel.logo_url && (
@@ -164,8 +164,14 @@ export default async function WatchPage({ params }: { params: Promise<{ slug: st
                 ))}
               </div>
             )}
+            {/* Mobile Share section (right below details) */}
+            <div className="block md:hidden mt-6">
+              <QRShare url={url} />
+            </div>
           </div>
-          <aside>
+          
+          {/* Desktop Share sidebar */}
+          <aside className="hidden md:block">
             <QRShare url={url} />
           </aside>
         </div>
