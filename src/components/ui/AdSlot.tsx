@@ -1,4 +1,5 @@
 import { supabasePublic } from "@/lib/supabase/server";
+import { AdRenderer } from "./AdRenderer";
 
 interface Props {
   position: string;
@@ -25,12 +26,14 @@ export async function AdSlot({ position }: Props) {
   }
 
   if (position.startsWith("global_")) {
-    return <div dangerouslySetInnerHTML={{ __html: data.script_html }} />;
+    return <AdRenderer html={data.script_html} />;
   }
 
   return (
     <div className="max-w-[1600px] mx-auto px-4 sm:px-6">
-      <div className="rounded-xl overflow-hidden border border-border bg-card" dangerouslySetInnerHTML={{ __html: data.script_html }} />
+      <div className="rounded-xl overflow-hidden border border-border bg-card">
+        <AdRenderer html={data.script_html} />
+      </div>
     </div>
   );
 }
