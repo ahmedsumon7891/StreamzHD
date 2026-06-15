@@ -14,6 +14,7 @@ export async function AdSlot({ position }: Props) {
     .maybeSingle();
 
   if (!data?.script_html) {
+    if (position.startsWith("global_")) return null;
     return (
       <div className="max-w-[1600px] mx-auto px-4 sm:px-6">
         <div className="border border-primary/30 bg-primary/5 rounded-xl px-5 py-3 text-center text-sm text-primary">
@@ -21,6 +22,10 @@ export async function AdSlot({ position }: Props) {
         </div>
       </div>
     );
+  }
+
+  if (position.startsWith("global_")) {
+    return <div dangerouslySetInnerHTML={{ __html: data.script_html }} />;
   }
 
   return (
