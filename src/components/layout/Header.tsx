@@ -100,9 +100,12 @@ export function Header() {
           href={telegramUrl}
           target="_blank"
           rel="noopener noreferrer"
-          className="bg-[#0088cc] hover:bg-[#0077b5] text-white px-4 py-1.5 sm:py-2 rounded-full flex items-center gap-2 text-xs sm:text-sm font-semibold transition-all shadow-md shadow-[#0088cc]/25 shrink-0"
+          className="bg-[#0088cc] hover:bg-[#0077b5] text-white w-9 h-9 sm:w-auto sm:h-auto px-0 sm:px-4 py-0 sm:py-2 rounded-full flex items-center justify-center gap-2 text-xs sm:text-sm font-semibold transition-all shadow-md shadow-[#0088cc]/25 shrink-0"
+          aria-label="Join Telegram"
         >
-          <Send className="h-3.5 w-3.5 fill-white rotate-45 -mt-0.5" />
+          <svg viewBox="0 0 24 24" className="h-5 w-5 sm:h-4 sm:w-4 fill-white shrink-0">
+            <path d="M20.665 3.717l-17.73 6.837c-1.21.486-1.203 1.161-.222 1.462l4.552 1.42 10.532-6.645c.498-.303.953-.14.578.192l-8.533 7.701-.332 4.966c.487 0 .702-.223.974-.485l2.338-2.27 4.862 3.592c.896.494 1.541.239 1.764-.83l3.19-15.022c.326-1.307-.5-1.9-.136-1.576z" />
+          </svg>
           <span className="hidden sm:inline">Join Telegram</span>
         </a>
       </div>
